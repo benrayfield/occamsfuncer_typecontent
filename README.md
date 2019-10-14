@@ -31,7 +31,7 @@ Treemaps are trie-like and have a max depth of the number of bits in an id and a
 
 AvlTreeList.
 
-It will come with a fn:ed25519 function for fast digital signatures. Other algorithms can be either added at the VM level or derived at user level (slower) later.
+It will come with a fn:ed25519 function for fast digital signatures, to be used for anything you like or not used. Other algorithms can be either added at the VM level or derived at user level (slower) later.
 
 S and K lambda based controlflow in the simplest cases but will also have higher level looping forms, which are also lambdas. There is no mutable system state except Gas.top which is a mutable double for how much computing resources are allowed in calls deeper than each point, as Op.gas and Op.spend. Every object is a self contained lazyEval-hashed merkle forest.
 
