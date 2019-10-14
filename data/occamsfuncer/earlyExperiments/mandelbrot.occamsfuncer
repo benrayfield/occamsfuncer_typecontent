@@ -1,0 +1,13 @@
+/*TODO build a func of 2 params (x,y) that returns brightness.
+TODO later, automatically opencl optimize funcs that can be done in small memory
+and without certain kinds of pointer jumping.
+Remember, the only syntax is currylist and comment and #name locally attached to things.
+unlike the more complex syntaxes of other forks of occamsfuncer.
+*/
+(
+	/*curry 2*/
+	fn:``
+	(
+		
+	)
+)
