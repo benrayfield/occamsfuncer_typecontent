@@ -6,6 +6,7 @@ fn:plus
 fn:cons
 n:5
 image/jpeg:...bytes of jpg file... (any content-type)
+(the ` char isnt displaying well in git website)
 `:H:abcH:def where abc and def are 34 byte ipfs ids (hash prefix such as sha256 then 32 bytes of hash). This is a funcall pair. ` is the name of this cuz that char is used in unlambda and iota languages.
 
 All such objects are either a leaf or ` funcall pair.
