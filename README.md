@@ -5,6 +5,10 @@ fn is the core object type.
 
 x.L().f(x.R()).equals(x), for all fn x.
 
+Id types start with H: (normal hash id) or h: (weakref is a func that returns 1 if its param is the thing its a weakref to in H: form, else 0) or ?: followed by an arbitrary local id not to be shared across untrusted borders. Only H: and h: are shared across untrusted borders as they are the merkle-forest (blockchain-like) kinds of ids suffixed by ipfs-compatible id.
+
+Any system, such as ipfs, bittorrent, ethereum, local, authoritarian websites, andOr direct peer to peer, can all work together as 1 network, though I'm skeptical of ethereum being 32 byte words and these being 36 byte which would further slow it down.
+
 type:content leaf examples:
 
 fn:plus
