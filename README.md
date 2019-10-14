@@ -3,7 +3,7 @@ minimalist programming language for massively multiplayer collaboration at gamin
 
 fn is the core object type.
 
-x.L().f(x.R()).equals(x), for all fn x.
+x.L().f(x.R()).equals(x), for all fn x. Each leaf type has a certain number of curries, before which (fn:plus 3) returns (fn:plus 3) but (fn:plus 3 4) returns 7. There will be more convenient syntaxes, especially for shared branches being #localNamed and for abstraction of s-lambda levels.
 
 Id types start with H: (normal hash id) or h: (weakref is a func that returns 1 if its param is the thing its a weakref to in H: form, else 0) or ?: followed by an arbitrary local id not to be shared across untrusted borders. Only H: and h: are shared across untrusted borders as they are the merkle-forest (blockchain-like) kinds of ids suffixed by ipfs-compatible id.
 
