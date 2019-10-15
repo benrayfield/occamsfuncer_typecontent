@@ -36,6 +36,8 @@ public final class Call<T> extends AbstractFn<T>{
 	
 	public final fn L, R;
 	
+	public final Op cacheOp;
+	
 	/** curries remaining before would eval */
 	public final byte cacheCur;
 	
@@ -45,7 +47,7 @@ public final class Call<T> extends AbstractFn<T>{
 		this.cacheCur = (byte)(L.cur()-1);
 		//this.op = func.op() else get it from func unless func is ??/TheImportFunc
 			//in which case (the dedup of) I am my own leftmostOp.
-		//this.cacheOp = L.op(); //L of L of L... return leaf.
+		this.cacheOp = L.op(); //L of L of L... return leaf.
 	}
 	
 	/*TODO should I start using enums again (like in the other fork of occamsfuncer)
@@ -58,8 +60,41 @@ public final class Call<T> extends AbstractFn<T>{
 	
 	/** if the new call halts, then is simply Call(this,param),
 	else runs until returns something or
-	HaltingDictator.topWallet runs out and throws HaltingDicator.instance.
+	Gas.top runs out and throws Gas.instance.
 	*/
+	public fn f(fn R){
+		//spend at least 1 nomatter what happens so always halts
+		//but doesnt always finish what was requested to do.
+		$();
+		if(cacheCur>1){
+			return Cache.dedup(new Call(this,R)); //TODO optimize by using other Cache func first?
+			//throw new Error("return dedup new Call(this,param), best if not create the Call if exists.");
+		}
+		if(cacheCur <= 0){
+			//can == 0 but should never be < 0 but just in case p2p net lies,
+			//check for it, and constraints should converge toward satisfied blockchainlike
+			//even if some peers lie, but in just 1 computer its straightforward
+			//and doesnt need to converge.
+			//
+			//Example: To protect controlflow of mapPair has const num of args
+			//(fn:mapPair size minKey maxKey minChild maxChild)
+			//but not (fn:mapPair size minKey maxKey minChild maxChild key),
+			//if that param (key) gets in here, infLoop()
+			//since you're supposed to use
+			//(fn:mapGet (fn:mapPair size minKey maxKey minChild maxChild) key).
+			//Same for anything else that returns itself if constraints satisfied.
+			return Gas.infLoop();
+		}
+		
+		//FIXME dedup here or inside each op?
+		return op().func.apply(this, R);
+	}
+	
+	
+	/** if the new call halts, then is simply Call(this,param),
+	else runs until returns something or
+	Gas.top runs out and throws Gas.instance.
+	*
 	public fn f(fn R){
 	
 		//FIXME I was doing it as param was the whole currylist,
@@ -155,60 +190,7 @@ public final class Call<T> extends AbstractFn<T>{
 			//which will CacheFuncParamReturn which is inefficient,
 			//but later optimize this by doing it all here in a loop.
 		break;
-		case Vm_switchInt.mapPair:
-			//(fn:mapPair size minKey maxKey minChild maxChild)
-			//aka (((((fn:mapPair size) minKey) maxKey) minChild) maxChild)
-			//Verify constraints. Do nothing aka Call(this,R) if pass, else infLoop().
-			
-			//TODO optimize by unrolling these funcs and reusing shared L.L.L... etc.
-			//size = mapPairSize(R);
-			fn minKey = mapPairMinKey(R);
-			fn maxKey = mapPairMaxKey(R);
-			fn minChild = mapPairMinChild(R);
-			fn maxChild = mapPairMaxChild(R);
-			if(
-				mapPairSize(R) == mapPairSize(minChild)+mapPairSize(maxChild)
-				&& minKey == mapMinKey(minChild)
-				&& maxKey == mapMaxKey(maxChild)
-				&& Compare.compare(mapMaxKey(minChild).rawGet(),mapMinKey(maxChild).rawGet()) < 0
-			){
-				ret = new Call(this,R);
-			}else{
-				ret = Gas.infLoop();
-			}
-			
-			
-			
-			//TODO use the funcs above instead of L L L R every time.
-			//
-			//fn RL=R.L(), RLL=RL.L(), RLLL=RLL.L(), RLLLL=RLL.L();
-			//double size = RLLLL.R().d();
-			//fn minKey = RLLL.R();
-			//fn maxKey = RLL.R();
-			//fn minChild = RL.R();
-			//fn maxChild = R.R();
-			//fn minChildLL = minChild.L().L();
-			//fn maxChildLL = maxChild.L().L();
-			//double minChild_size = minChildLL.L().L().R().d();
-			//double maxChild_size = maxChildLL.L().L().R().d();
-			////TODO optimize: some of these share .L().L()... calls.
-			//fn minChild_minKey = minChildLL.L().R();
-			//fn minChild_maxKey = minChildLL.R();
-			//fn maxChild_minKey = maxChildLL.L().R();
-			//fn maxChild_maxKey = maxChildLL.R();
-			////TODO these constraints will need to be checked for in p2p network also
-			//if(
-			//	size == minChild_size+maxChild_size
-			//	|| minKey == minChild_minKey
-			//	|| maxKey == maxChild_maxKey
-			//	|| minChild's maxKey < maxChild's minKey.
-			//	TODO how to compare byte[] to byte[]? and is it signed?
-			//){
-			//	ret = new Call(this,R);
-			//}else{
-			//	ret = fn.infLoop();
-			//}
-		break;
+		
 		default:
 			//If a func exists in some implementations but not in this one,
 			//pretend it does exist but infinitely inefficient,
@@ -220,8 +202,8 @@ public final class Call<T> extends AbstractFn<T>{
 		//so isnt strong dedup but works enough for forest of s and k calls
 		//to not expand exponentially,
 		//imilar to it would for fibonnacci computed by recursion.
-		return dedup of ret;
-	}
+		return Cache.dedup(ret);
+	}*/
 	
 	/** ((L x) (R x)) evals to x for any x thats halted. */
 	public fn L(){
@@ -247,17 +229,17 @@ public final class Call<T> extends AbstractFn<T>{
 
 	public int rawLen(){
 		//`:idAidB where each id is size fn.idSize
-		return 2+func.idSize()+param.idSize();
+		return 2+L.idSize()+R.idSize();
 	}
 
 	public void rawGet(OutputStream out){
 		try{
 			out.write((byte)'`');
 			out.write((byte)':');
-			func.id().rawGet(out);
+			L.id().rawGet(out);
 			//FIXME since not every type:content tells its size (such as by varint prefix)
 			//then how to know where first id ends?
-			param.id().rawGet(out);
+			R.id().rawGet(out);
 		}catch(IOException e){ throw new RuntimeException(e); }
 	}
 
@@ -265,6 +247,19 @@ public final class Call<T> extends AbstractFn<T>{
 
 	public int idSize(){
 		return fn.maxIdSize;
+	}
+
+	public boolean isLeaf(){
+		return false;
+	}
+
+	public Op op(){
+		return cacheOp;
+	}
+	
+	/** FIXME this will expand exponentially if has linear depth of shared branches */
+	public String toString(){
+		return "("+L+" "+R+")";
 	}
 
 }

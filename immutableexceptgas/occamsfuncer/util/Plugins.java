@@ -60,17 +60,16 @@ public class Plugins{
 		$(10000);
 		javaFuncName = javaFuncName.trim();
 		int i = javaFuncName.lastIndexOf('.');
-		if(i == -1) throw Gas.instance; //caught at innermost Opcode.spend
 		String className = javaFuncName.substring(0,i);
 		try{
 			Class c = Class.forName(className);
 			String funcName = javaFuncName.substring(i+1);
-			if(!funcName.startsWith(whitelistPrefix)) throw Gas.instance; //caught at innermost Opcode.spend
+			if(!funcName.startsWith(whitelistPrefix)) throw Gas.instance(); //caught at innermost Opcode.spend
 			final Method m = c.getMethod(funcName, fn.class);
 			int modifiers = m.getModifiers();
-			if(!Modifier.isStatic(m.getModifiers())) throw Gas.instance; //caught at innermost Opcode.spend
+			if(!Modifier.isStatic(m.getModifiers())) throw Gas.instance(); //caught at innermost Opcode.spend
 			Class retType = m.getReturnType();
-			if(retType != fn.class) throw Gas.instance; //caught at innermost Opcode.spend
+			if(retType != fn.class) throw Gas.instance(); //caught at innermost Opcode.spend
 			UnaryOperator<fn> plugin = (fn p)->{
 				try{
 					return (fn) m.invoke(null, p);
@@ -79,7 +78,7 @@ public class Plugins{
 					throw new Error(x);
 				}catch(InvocationTargetException x){
 					//caught either HaltingDictator.throwMe or something wrapping it or plugin is badly designed
-					throw Gas.instance; //caught at innermost Opcode.spend
+					throw Gas.instance(); //caught at innermost Opcode.spend
 				}
 			};
 			plugins.put(javaFuncName, plugin);
@@ -88,7 +87,7 @@ public class Plugins{
 		}catch(ClassNotFoundException | NoSuchMethodException | SecurityException e){
 			//TODO if its a SecurityException, log it the first time.
 			//Else its easy to figure out from params and which java funcs exist and their names. 
-			throw Gas.instance; //caught at innermost Opcode.spend
+			throw Gas.instance(); //caught at innermost Opcode.spend
 		}
 	}
 	

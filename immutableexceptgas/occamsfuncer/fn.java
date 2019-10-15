@@ -1,6 +1,6 @@
 /** Ben F Rayfield offers this software opensource MIT license */
 package immutableexceptgas.occamsfuncer;
-
+import static immutableexceptgas.occamsfuncer.util.ImportStatic.*;
 import java.io.ByteArrayOutputStream;
 import java.io.OutputStream;
 
@@ -53,6 +53,16 @@ public interface fn<T>{
 	public static final int maxIdSize = 36;
 	
 	public fn f(fn param);
+	
+	/** same as f(fn) but wraps param the standard way (ImportStatic.wr(double)) */
+	public default fn f(double param){
+		return f(wr(param));
+	}
+	
+	/** same as f(fn) but wraps param the standard way (ImportStatic.wr(Object)) */
+	public default fn f(Object param){
+		return f(wr(param));
+	}
 	
 	public boolean isLeaf();
 	

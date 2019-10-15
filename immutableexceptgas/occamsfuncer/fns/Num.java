@@ -34,7 +34,7 @@ public class Num implements fn{
 	}
 
 	public fn L(){
-		return Const.identity;
+		return Op.i.f;
 	}
 
 	public fn R(){
@@ -83,6 +83,8 @@ public class Num implements fn{
 		}catch(IOException e){ throw new RuntimeException(e); }
 	}
 	
-	
+	public boolean isLeaf(){
+		return true;
+	}
 
 }

@@ -1,13 +1,116 @@
 /** Ben F Rayfield offers this software opensource MIT license */
 package immutableexceptgas.occamsfuncer;
 import static immutableexceptgas.occamsfuncer.Gas.*;
+import static immutableexceptgas.occamsfuncer.util.FnFuncs.mapMaxKey;
+import static immutableexceptgas.occamsfuncer.util.FnFuncs.mapMinKey;
+import static immutableexceptgas.occamsfuncer.util.FnFuncs.mapPairMaxChild;
+import static immutableexceptgas.occamsfuncer.util.FnFuncs.mapPairMaxKey;
+import static immutableexceptgas.occamsfuncer.util.FnFuncs.mapPairMinChild;
+import static immutableexceptgas.occamsfuncer.util.FnFuncs.mapPairMinKey;
+import static immutableexceptgas.occamsfuncer.util.FnFuncs.mapPairSize;
 import static immutableexceptgas.occamsfuncer.util.ImportStatic.*;
 
 import java.util.function.BinaryOperator;
 
+import immutableexceptgas.occamsfuncer.fns.Call;
 import immutableexceptgas.occamsfuncer.fns.Leaf;
+import immutableexceptgas.occamsfuncer.util.Compare;
 
 public enum Op{
+	
+	/** The gas and spend ops are the only 2 mutable ops, other than what may call them.
+	Read how much gas is available from here and deeper calls.
+	parent caller and farther back may have more.
+	*/
+	gas(1, DetLev.nondet, (BinaryOperator<fn>)(L,R)->{
+		$();
+		return wr(Gas.top);
+	}),
+	
+	/** Limit gas use in deeper calls, which can themselves further limit it,
+	and if that limit is not enough (run out of compute resources),
+	while doing (w x), and if thats not enough compute resources
+	then after that fails does (y z) charged to parent call's gas.
+	<br><br>
+	(fn:spend limit w x y z)
+	<br><br>
+	The gas and spend ops are the only 2 mutable ops, other than what may call them.
+	spend gas on (w x) up to a limit else at parent caller's (y z).
+	You can set spend limit, for deeper calls, between 0 and Gas.top (aka gas op),
+	else it will be truncated into that range.
+	Its best to leave at least a little gas in case of failure
+	so your failure code can return instead of not having enough gas left to start.
+	Any gas that was available not used is still available after the call.
+	<br><br>
+	FIXME nondeterminism complicates caching since whatever it returns the first time
+	will be what it returns in all future calls until Cache.clear(),
+	but it has to be that way cuz theres nowhere else to store things
+	between when a call starts and ends such as a calculation that
+	calls the same fn in multiple other fns as the s kind of controlFlow,
+	which is the simplest kind of controlFlow, usually does.
+	Fibonacci defined recursively costs linear instead of exponential.
+	*/
+	spend(5, DetLev.nondet, (BinaryOperator<fn>)(L,R)->{
+		$();
+		//TODO optimize by not L.L.L... multiple times.
+		double limit = L.L().L().L().R().d();
+		fn w = L.L().L().R();
+		fn x = L.L().R();
+		if(limit < 0) limit = 0;
+		limit = Math.min(Gas.top, limit);
+		double removedFromTopGas = Gas.top-limit;
+		double newTopGas = limit;
+		boolean failed = true;
+		try{
+			fn ret = w.f(x); //cost inside spend call
+			Gas.top += removedFromTopGas;
+			return ret;
+		}catch(Gas g){
+			Gas.top += removedFromTopGas;
+			fn y = L.R();
+			fn z = R;
+			return y.f(z); //cost outside spend call
+		}
+	}),
+	
+	plugNondet(1, DetLev.nondet, (BinaryOperator<fn>)(L,R)->{
+		$();
+		throw new Error("TODO.");
+	}),
+	
+	/** same as Op.spend but chooses (w x) vs (y z) instantly
+	based on if theres minGas or more amount of gas left or not.
+	Either path could still run out of compute resources
+	after starting the call.
+	The advantage of this over Op.spend is if it takes the (w x) path,
+	its still deterministic as its future actions dont depend
+	on any specific value of Gas.top (Op.gas)
+	so does not change Gas.deterministicSoFar so can sync across Internet.
+	*/
+	gasAtLeast(5, DetLev.detUnlessFail, (BinaryOperator<fn>)(L,R)->{
+		throw new Error("TODO");
+	}),
+	
+	
+	
+	//Everything below is DetLev.det
+	
+
+	
+	/** any static java func whose name (after package.a.b.classname) starts with
+	"ocfnplug", and which takes 1 param which is a fn, can be called this way.
+	Such functions are considered part of the occamsfuncerVM
+	so make sure they only come from trusted sources.
+	<br><br>
+	(fn:plug ;immutableexceptgas.occamsfuncer.util.Plugins.ocfnplugExamplePlusOne 10)
+	returns 11.
+	(fn:plug ;immutableexceptgas.occamsfuncer.util.Plugins.notanocfnplugExamplePlusOne 10)
+	does infLoop() (throws Gas.instance).
+	*/
+	plugDet(1, DetLev.det, (BinaryOperator<fn>)(L,R)->{
+		$();
+		throw new Error("TODO code works in other fork of occamsfuncer. mostly copy that here. also set up a search for all ocfnplug funcs avail.");
+	}),
 	
 	/*I want the form of these that uses java stack
 	for mapGet and mapPut etc recursion
@@ -30,23 +133,161 @@ public enum Op{
 		throw new RuntimeException("TODO this in Call.f(fn) first, the pure interpreted way.");
 	}*/
 	
-	s(3, (BinaryOperator<fn>)(fn L, fn R)->{
-		//(fn:k x y R) returns ((x R)(y R))
+	/** La.Lb.Lc.ac(bc), the s of https://en.wikipedia.org/wiki/SKI_combinator_calculus */
+	s(3, DetLev.det, (BinaryOperator<fn>)(fn L, fn R)->{
+		//(fn:s x y R) returns ((x R)(y R))
+		$();
+		
+		//FIXME? L.L() is fn:i when L is fn:s cuz fn:s is a leaf
+		//but L should never be fn:s here cuz that not enough curries.
 		fn x = L.L().R();
 		fn y = L.R();
 		return x.f(R).f(y.f(R));
 	}),
 	
-	k(2, (BinaryOperator<fn>)(fn L, fn R)->{
+	/** La.Lb.a, the k of https://en.wikipedia.org/wiki/SKI_combinator_calculus */
+	k(2, DetLev.det, (BinaryOperator<fn>)(fn L, fn R)->{
 		//(fn:k q i) returns q
+		$();
 		return L.R();
 	}),
 	
-	/** TODO see the other fork of occamsfuncer where its a coretype,
+	/** identity function. */
+	i(1, DetLev.det, (BinaryOperator<fn>)(fn L, fn R)->{
+		//(fn:i R) returns R
+		$();
+		return R;
+	}),
+	
+	//TODO fn:c and fn:C as curry1, which is only used for recursion
+	//since a func is already of 1 param.
+	
+	/** same as cc except slower and does fn:pl to param first so i easier to use.
+	(fn:CC func a b) returns (func l(fn:CC func a b))
+	*/
+	CC(3, DetLev.det, (BinaryOperator<fn>)(fn L, fn R)->{
+		//TODO use the same BinaryOperator for CC and CCC etc since they're
+		//already exactly the same code, BUT that might change when do the optimization.
+		fn cons = cons.f;
+		fn pl = pl.f;
+		//TODO optimize by not creating the cons. create the linkedlist here.
+		return func.f(pl.f(cons.f(L).f(R)));
+	}),
+	
+	/** curry 2. (fn:cc func a b) returns (func (cons (fn:cc func a) b)) */
+	cc(3, DetLev.det, (BinaryOperator<fn>)(fn L, fn R)->{
+		$();
+		fn cons = cons.f;
+		return func.f(cons.f(L).f(R));
+		
+		
+		/*fn param = FIXME cant L.f(R) here cuz infinite loop;
+		return L.f(param);
+		
+		It may have been consistent design in the other fork of occamsfuncer
+		but here it seems to need param to be either linkedlist (inefficient)
+		or for func to take 2 params (complicates and makes inefficient
+		cuz requires s-currying since the curry ops
+		are how you make a func of multiple params).
+		
+		How do I want to get the params at user level?
+		
+		param = f(cons,L,R)?
+		
+		param = linkedlist of fn:cc func a b?
+		
+		param = linkedlist of func a b?
+		
+		param = linkedlist of a b?
+		
+		param contains some opcode specialized in efficient params?
+		No cuz couldnt do better than cons based linkedlist.
+		
+		Consider how recursion would work. In the other fork of occamsfuncer,
+		f(fn:recurse func param) returns f(func f(fn:cons f(fn:recurse func) param)).
+		The f(fn:recur func) might need to be reused so maybe should be in param
+		that fn:recur creates.
+		
+		Curry could be defined as including the func, so you wouldnt need
+		a separate fn:recur. Maybe they should be the same op.
+		
+		How about instead of cons L R, lazyEval L R? No, it doesnt take any more params
+		so Call.f(...) would always correctly infLoop.
+		
+		I choose for there to be no fn:recur,
+		and the param will be f(fn:cons myL myR),
+		and there will be fn:pl
+		*/
+		
+	}),
+	
+	/** parame linkedlist.
+	Example: f(fn:ccc mult3Things 3 4 5) returns 60,
+	by computing: f(mult3Things f(cons f(fn:ccc mult3Things 3 4) 5)).
+	The cons is needed cuz f(fn:ccc mult3Things 3 4 5) would eval to 60
+	if it didnt infiniteLoop, so it would lose the info of what
+	computed the 60.
+	f(fn:pl f(cons f(fn:ccc mult3Things 3 4) 5))
+	returns l(fn:ccc mult3Things 3 4 5), so mult3Things might contain fn:pl,
+	but mult3Things's param must still be f(cons f(fn:ccc mult3Things 3 4) 5)
+	for efficiency since (fn:ccc mult3Things 3 4 5) is (((fn:ccc mult3Things 3) 4) 5)
+	which contains (fn:ccc mult3Things 3 4).
+	*/
+	pl(1, DetLev.det, (BinaryOperator<fn>)(fn L, fn R)->{
+		throw new Error("TODO");
+	});
+	
+	/** inverse of pl. You would use this if calling a func in a curry op
+	without calling the curry op,
+	but normally you would just call it in the curry op without this.
+	*/
+	plInv(1, DetLev.det, (BinaryOperator<fn>)(fn L, fn R)->{
+		throw new Error("TODO");
+	});
+	
+	/** Use curry ops instead, which recursion can be derived in since
+	the func is included in its own param list after the curry op.
+	f(fn:recur func param) returns f(func f(fn:cons f(fn:recur func) param)).
+	func can contain car to get f(fn:recur func) and cdr to get param.
+	TODO fibonacci example by recursion. 
+	*
+	recur(2, DetLev.det, (BinaryOperator<fn>)(fn L, fn R)->{
+		$();
+		fn recurFunc = L;
+		fn func = recurFunc.R();
+		fn param = R;
+		fn cons = cons.f;
+		return func.f(cons.f(recurFunc).f(param));
+	}),*/
+	
+	/** curry 3. (fn:cc func a b) returns (func (fn:cc func a b)) */
+	ccc(4, DetLev.det, (BinaryOperator<fn>)(fn L, fn R)->{
+		throw new Error("TODO");
+	}),
+	
+	/** same as ccc except slower and does fn:pl to param first so i easier to use.
+	(fn:CCC func a b) returns (func l(fn:cc func a b))
+	*/
+	CCC(4, DetLev.det, (BinaryOperator<fn>)(fn L, fn R)->{
+		//TODO use the same BinaryOperator for CC and CCC etc since they're
+		//already exactly the same code, BUT that might change when do the optimization.
+		fn cons = cons.f;
+		fn pl = pl.f;
+		//TODO optimize by not creating the cons. create the linkedlist here.
+		return func.f(pl.f(cons.f(L).f(R)));
+	}),
+		
+	//TODO curry up to 15 so the num of curries fits in 4 bits.
+	
+	
+	/** Renamed this from sCall to F cuz of F(...) vs f(...) syntax meaning fn.f().f()...
+	but F(...) is some Op.s mixed in that in a way that curries a param recursively
+	<br><br>.
+	TODO see the other fork of occamsfuncer where its a coretype,s
 	but there are no coretypes here. This is the F(...) syntax.
 	The first 2 curries define a binary tree, similar to see comment in sLinkedList.
 	*/
-	sCall(3, (BinaryOperator<fn>)(fn L, fn R)->{
+	F(3, DetLev.det, (BinaryOperator<fn>)(fn L, fn R)->{
 		throw new Error("TODO");
 	}),
 	
@@ -56,7 +297,7 @@ public enum Op{
 	to prefix to the list and the other is the rest of the list,
 	and the last curry is like the param of s (except this is 1 abstraction higher).
 	*/
-	sLinkedList(3, (BinaryOperator<fn>)(fn L, fn R)->{
+	sLinkedList(3, DetLev.det, (BinaryOperator<fn>)(fn L, fn R)->{
 		throw new Error("TODO");
 	}),
 	
@@ -66,83 +307,137 @@ public enum Op{
 	(which actually skips to the end of that infinity instantly
 	by throwing Gas.instance), its the same lambda math just slower.
 	*/
-	infLoop(3, (BinaryOperator<fn>)(fn L, fn R)->{
-		return fn.infLoop();
+	infLoop(3, DetLev.det, (BinaryOperator<fn>)(fn L, fn R)->{
+		return Gas.infLoop();
 	}),
 	
 	/** (fn:igfp IGnoreData Func Param) returns (Func Param) */
-	igfp(3, (BinaryOperator<fn>)(fn L, fn R)->{
+	igfp(3, DetLev.det, (BinaryOperator<fn>)(fn L, fn R)->{
 		$();
 		return L.R().f(R);
 	}),
 	
-	/** (fn:plus x y) returns x+y */
-	plus(2, ((BinaryOperator<fn>)(fn L, fn R)->{
+	/** (fn:add x y) returns x+y */
+	add(2, DetLev.det, (BinaryOperator<fn>)(fn L, fn R)->{
 		$();
 		return wr(L.R().d()+R.d());
-	})),
-	
-	/** any static java func whose name (after package.a.b.classname) starts with
-	"ocfnplug", and which takes 1 param which is a fn, can be called this way.
-	Such functions are considered part of the occamsfuncerVM
-	so make sure they only come from trusted sources.
-	<br><br>
-	(fn:plug ;immutableexceptgas.occamsfuncer.util.Plugins.ocfnplugExamplePlusOne 10)
-	returns 11.
-	(fn:plug ;immutableexceptgas.occamsfuncer.util.Plugins.notanocfnplugExamplePlusOne 10)
-	does infLoop() (throws Gas.instance).
-	*/
-	plug(1, (BinaryOperator<fn>)(L,R)->{
-		$();
-		throw new Error("TODO code works in other fork of occamsfuncer. mostly copy that here. also set up a search for all ocfnplug funcs avail.");
 	}),
 	
-	/** The gas and spend ops are the only 2 mutable ops, other than what may call them.
-	Read how much gas is available from here and deeper calls.
-	parent caller and farther back may have more.
-	*/
-	gas(1, (BinaryOperator<fn>)(L,R)->{
+	/** (fn:add x y) returns x*y */
+	mul(2, DetLev.det, (BinaryOperator<fn>)(fn L, fn R)->{
 		$();
-		return wr(Gas.top);
+		return wr(L.R().d()*R.d());
 	}),
 	
-	/** Limit gas use in deeper calls, which can themselves further limit it,
-	and if that limit is not enough (run out of compute resources),
-	while doing (w x), and if thats not enough compute resources
-	then after that fails does (y z) charged to parent call's gas.
-	<br><br>
-	(fn:spend limit w x y z)
-	<br><br>
-	The gas and spend ops are the only 2 mutable ops, other than what may call them.
-	spend gas on (w x) up to a limit else at parent caller's (y z).
-	You can set spend limit, for deeper calls, between 0 and Gas.top (aka gas op),
-	else it will be truncated into that range.
-	Its best to leave at least a little gas in case of failure
-	so your failure code can return instead of not having enough gas left to start.
-	Any gas that was available not used is still available after the call.
-	*/
-	spend(2, (BinaryOperator<fn>)(L,R)->{
-		$();
-		//TODO optimize by not L.L.L... multiple times.
-		double limit = L.L().L().L().R().d();
-		fn w = L.L().L().R();
-		fn x = L.L().R();
-		if(limit < 0) limit = 0;
-		limit = Math.min(Gas.top, limit);
-		double removedFromTopGas = Gas.top-limit;
-		double newTopGas = limit;
-		boolean failed = true;
-		try{
-			fn ret = w.f(x); //cost inside spend call
-			Gas.top += removedFromTopGas;
-			return ret;
-		}catch(Gas g){
-			Gas.top += removedFromTopGas;
-			fn y = L.R();
-			fn z = R;
-			return y.f(z); //cost outside spend call
+	/**FIXME if allow arbitrary ids as map key then can DoSAttack
+	maps up to their worst case of depth which is num of bits in an id
+	(2019-10-14 this is 288 aka 36 bytes).
+	Is much more DoSAttack resistant if it has to be hashed.
+	
+	case Vm_switchInt.mapPair:
+		//(fn:mapPair size minKey maxKey minChild maxChild)
+		//aka (((((fn:mapPair size) minKey) maxKey) minChild) maxChild)
+		//Verify constraints. Do nothing aka Call(this,R) if pass, else infLoop().
+		
+		//TODO optimize by unrolling these funcs and reusing shared L.L.L... etc.
+		//size = mapPairSize(R);
+		fn minKey = mapPairMinKey(R);
+		fn maxKey = mapPairMaxKey(R);
+		fn minChild = mapPairMinChild(R);
+		fn maxChild = mapPairMaxChild(R);
+		if(
+			mapPairSize(R) == mapPairSize(minChild)+mapPairSize(maxChild)
+			&& minKey == mapMinKey(minChild)
+			&& maxKey == mapMaxKey(maxChild)
+			&& Compare.compare(mapMaxKey(minChild).rawGet(),mapMinKey(maxChild).rawGet()) < 0
+		){
+			ret = new Call(this,R);
+		}else{
+			ret = Gas.infLoop();
 		}
+		
+		
+		
+		//TODO use the funcs above instead of L L L R every time.
+		//
+		//fn RL=R.L(), RLL=RL.L(), RLLL=RLL.L(), RLLLL=RLL.L();
+		//double size = RLLLL.R().d();
+		//fn minKey = RLLL.R();
+		//fn maxKey = RLL.R();
+		//fn minChild = RL.R();
+		//fn maxChild = R.R();
+		//fn minChildLL = minChild.L().L();
+		//fn maxChildLL = maxChild.L().L();
+		//double minChild_size = minChildLL.L().L().R().d();
+		//double maxChild_size = maxChildLL.L().L().R().d();
+		////TODO optimize: some of these share .L().L()... calls.
+		//fn minChild_minKey = minChildLL.L().R();
+		//fn minChild_maxKey = minChildLL.R();
+		//fn maxChild_minKey = maxChildLL.L().R();
+		//fn maxChild_maxKey = maxChildLL.R();
+		////TODO these constraints will need to be checked for in p2p network also
+		//if(
+		//	size == minChild_size+maxChild_size
+		//	|| minKey == minChild_minKey
+		//	|| maxKey == maxChild_maxKey
+		//	|| minChild's maxKey < maxChild's minKey.
+		//	TODO how to compare byte[] to byte[]? and is it signed?
+		//){
+		//	ret = new Call(this,R);
+		//}else{
+		//	ret = fn.infLoop();
+		//}
+	break;
+	...
+	//dedup was in CacheFuncParamReturn.java in other fork of occamsfuncer
+	//and does not trigger lazyHash cuz compares by == and hashCode
+	//so isnt strong dedup but works enough for forest of s and k calls
+	//to not expand exponentially,
+	//imilar to it would for fibonnacci computed by recursion.
+	return dedup of ret;
+	*/
+	mapPair(5, DetLev.det, (BinaryOperator<fn>)(fn L, fn R)->{
+		//(fn:mapPair size minKey maxKey minChild maxChild)
+		$();
+		//(fn:mapPair size minKey maxKey minChild maxChild)
+		//aka (((((fn:mapPair size) minKey) maxKey) minChild) maxChild)
+		//Verify constraints. Do nothing aka Call(this,R) if pass, else infLoop().
+		
+		//TODO optimize by unrolling these funcs and reusing shared L.L.L... etc.
+		//size = mapPairSize(R);
+		fn minKey = mapPairMinKey(R);
+		fn maxKey = mapPairMaxKey(R);
+		fn minChild = mapPairMinChild(R);
+		fn maxChild = mapPairMaxChild(R);
+		fn ret;
+		if(
+			mapPairSize(R) == mapPairSize(minChild)+mapPairSize(maxChild)
+			&& minKey == mapMinKey(minChild)
+			&& maxKey == mapMaxKey(maxChild)
+			&& Compare.compare(mapMaxKey(minChild).rawGet(),mapMinKey(maxChild).rawGet()) < 0
+		){
+			ret = new Call(L,R);
+		}else{
+			ret = Gas.infLoop();
+		}
+		return Cache.dedup(ret);
+	}),
+	
+	/** (fn:ed25519 l(;sign pubkey data)) returns signature.
+	(fn:ed25519 l(;verify signature)) returns 1 if verified else 0.
+	TODO signature contains pubkey?
+	TODO is data any fn or is it a fn representing a byte array,
+	and if so does it exclude the type: prefix in type:content
+	and the content is just the byte array?
+	Probably it will be any fn, just signing its id()
+	(sha512 of that id, cuz it needs more hash bits and thats the usual implementation of ed25519).
+	TODO if signature not contain pubkey then the linkedlist l(...) must be 1 bigger.
+	*/
+	ed25519_sha512_ofFn(1, DetLev.det, (BinaryOperator<fn>)(fn L, fn R)->{
+		throw new Error("TODO");
 	});
+	
+	
 	
 	/*(opencl)ForestOp
 	
@@ -179,6 +474,8 @@ public enum Op{
 	
 	public final byte cur;
 	
+	public final DetLev detLev;
+	
 	/** Its BinaryOperator instead of UnaryOperator
 	cuz Call.java is not created for the last curry unless
 	the call caused by that last curry returns itself therefore doesnt run again.
@@ -188,8 +485,9 @@ public enum Op{
 	public final fn f;
 	
 	/** cur is number of curries before execute. Less than that returns self. */
-	private Op(int cur, BinaryOperator<fn> func){
+	private Op(int cur, DetLev detLev, BinaryOperator<fn> func){
 		this.cur = (byte)cur;
+		this.detLev = detLev;
 		this.func = func;
 		f = new Leaf("fn:"+this.name());
 	}

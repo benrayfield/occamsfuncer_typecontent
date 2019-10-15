@@ -1,9 +1,9 @@
 /** Ben F Rayfield offers this software opensource MIT license */
 package immutableexceptgas.occamsfuncer.fns;
-
+import static immutableexceptgas.occamsfuncer.Gas.*;
 import java.io.OutputStream;
-
 import immutable.util.Text;
+import immutableexceptgas.occamsfuncer.Cache;
 import immutableexceptgas.occamsfuncer.Op;
 import immutableexceptgas.occamsfuncer.fn;
 import immutableexceptgas.occamsfuncer.util.Const;
@@ -19,6 +19,8 @@ public class Leaf<T> extends AbstractFn<T>{
 	
 	protected T cacheObject;
 	
+	protected Op cacheOp;
+	
 	/** example: "g:hello world" represents the string "hello world",
 	and "fn:plus" represents the plus opcode.
 	*/
@@ -30,9 +32,33 @@ public class Leaf<T> extends AbstractFn<T>{
 	public Leaf(byte[] b){
 		this.cacheBytes = b;
 	}
+	
+	public boolean isOp(){
+		rawGet();
+		return cacheBytes.length > 2 && cacheBytes[0]=='f' && cacheBytes[1]=='n';
+	}
 
 	public fn f(fn param){
-		throw new Error("TODO");
+		//TODO merge duplicate code between Leaf.f(fn) and Call.f(fn)
+		$();
+		/*TODO optimize. Can be much faster by caching this result,
+		isOp, !isOp, or hasnt checked yet.
+		If this is an Op (starts with fn:) then wrap in Call(this,param)
+		but find a way to do it efficiently, dont want to scan the bytes every time.
+		For now, just check the bytes.
+		*/
+		if(isOp()){
+			Op o = op();
+			if(o.cur == 1){ //eval. Would be error if cur<1 but that should never happen
+				return o.func.apply(this, param);
+			}else{ //not enough curries to eval
+				return new Call(this,param);
+			}
+		}else{
+			//optimization of Op being fn:i (identityFunc),
+			//or would that circularLogic and this is more than an optimization?
+			return this;
+		}
 	}
 	
 	/** cuz is not known to be an opcode in this occamsfuncerVM
@@ -41,14 +67,28 @@ public class Leaf<T> extends AbstractFn<T>{
 	but not return a different answer so the lambda math is still correct.
 	*/
 	public Op op(){
-		return Op.infLoop;
+		if(cacheOp == null){
+			if(isOp()){ //calls rawGet which fills cacheBytes. FIXME this wont always be true for large leafs.
+				try{
+					String s = Text.bytesToString(cacheBytes); //FIXME might not be valid UTF8
+					int i = s.indexOf(':');
+					if(i != -1) s = s.substring(i+1);
+					cacheOp = Op.valueOf(s);
+				}catch(Throwable t){
+					//TODO optimize. this could probably be done much faster than catch.
+					//not UTF8 (bytesToString) so is not an op name, or not one of the op names
+					cacheOp = Op.infLoop;
+				}
+			}
+		}
+		return cacheOp;
 	}
 	
 	/** ((L x) (R x)) evals to x for any x thats halted,
 	so L of leaf is identityFunc and R is that leaf.
 	*/
 	public fn L(){
-		return Const.identity; //TODO derive as (iota iota)
+		return Op.i.f; //TODO derive as (iota iota)
 	}
 	
 	/** ((L x) (R x)) evals to x for any x thats halted,
@@ -71,7 +111,8 @@ public class Leaf<T> extends AbstractFn<T>{
 	}
 
 	public int rawLen(){
-		throw new Error("TODO");
+		if(cacheBytes != null) return cacheBytes.length;
+		throw new Error("TODO"); //might be cacheObject and need transforming to bytes
 	}
 	
 	public byte[] rawGet(){
@@ -86,11 +127,24 @@ public class Leaf<T> extends AbstractFn<T>{
 	}
 
 	public byte cur(){
-		return 1;
+		return op().cur;
 	}
 
 	public int idSize(){
 		return Math.min(rawLen(), fn.maxIdSize);
+	}
+
+	public boolean isLeaf(){
+		return true;
+	}
+	
+	public String toString(){
+		if(rawLen() > 100) return "leaf_size_"+rawLen();
+		try{
+			return Text.bytesToString(rawGet());
+		}catch(Throwable t){
+			return "TODO_display_nonUtf8";
+		}
 	}
 
 }

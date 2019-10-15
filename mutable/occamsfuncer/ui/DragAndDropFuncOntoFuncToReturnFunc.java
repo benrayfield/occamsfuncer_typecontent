@@ -15,7 +15,7 @@ are held.
 */
 public class DragAndDropFuncOntoFuncToReturnFunc extends JPanel{
 	
-	TODO allow drawing on icon and changing #name per icon
+	/*TODO allow drawing on icon and changing #name per icon
 	so Humans can remember it, which does not affect icon.data.id(),
 	and have a textarea in left for displaying code form
 	of whatevers selected (or maybe only if you do a certain thing)
@@ -28,5 +28,6 @@ public class DragAndDropFuncOntoFuncToReturnFunc extends JPanel{
 	of other funcs on them.
 	Ids will be 36 bytes, so 48 base64 digits,
 	so could put in 7x7 grid of chars.
+	*/
 
 }
