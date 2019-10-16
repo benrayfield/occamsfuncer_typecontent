@@ -28,6 +28,9 @@ public enum DetLev{
 	
 	detUnlessFail,
 	
-	nondet;
+	nondet,
+	
+	/** this will not be a permanent part of DetLev, just until I choose a DetLev for each op. */
+	unknownTodoFixThis;
 
 }

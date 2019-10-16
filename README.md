@@ -40,7 +40,6 @@ Caches <func,param,return> so can fibonacci recursively in linear instead of exp
 (these things are incomplete, but the core design is nearly finished).
 
 Older fork of occamsfuncer is at https://github.com/benrayfield/occamsfuncer_old, some of which will be used, but not the coretypes. There are no coretypes anymore in funcall pairs.
-<<<<<<< HEAD
 
 
 package immutableexceptgas.occamsfuncer.tests;
@@ -214,5 +213,3 @@ public class TestBasics{
 
 }
 
-=======
->>>>>>> 006a64417f9bc282f4a5246e53e62c2d0b795934

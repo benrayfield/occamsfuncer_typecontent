@@ -30,7 +30,7 @@ public class TestBasics{
 	*/
 	
 	//@Test
-	public void testSkk(){
+	public static void testSkk(){
 		fn s = Op.s.f; //TODO same as dedup(new Leaf("fn:s"))
 		lg("s: "+s+" cur="+s.cur());
 		fn k = Op.k.f;
@@ -47,17 +47,31 @@ public class TestBasics{
 		assertTrue(skk.f(k).equals(k));
 	}
 	
+	/** https://en.wikipedia.org/wiki/Church_encoding
+	Theres optimization where car and cdr check if their param
+	is (fn:cons x y) for any x y) and if so they dont call the cons
+	but just return the x or y directly using L and R.
+	That must get the same result as churchEncoding.
+	*/
+	public static void testConsCarCdrNilAsChurchEncoding(){
+		fn cons = Op.cons.f;
+		fn car = Op.car.f;
+		fn cdr = Op.cdr.f;
+		fn nil = Op.nil.f;
+		throw new Error("TODO");
+	}
+	
 	/** hypot is a function of 2 params that returns sqrt(x^2 + y^2).
 	This test is of the curry2 op fn:cc. Curry3 would be fn:ccc.
 	*/
-	public void testCurry2Hypot(){
-		fn s = Op.s.f;
+	public static void testCurry2Hypot(){
+		/*fn s = Op.s.f;
 		//fn F = Op.F.f; //sCall, 1 s-lambda-level above s.
 		fn k = Op.k.f;
 		fn i = Op.i.f;
 		fn cc = Op.cc.f; //curry2
-		fn getX = TODO; //get second last param when cc.f(...) gets all its params
-		fn getY = TODO; //get last param
+		fn getX = null;//fixme; //get second last param when cc.f(...) gets all its params
+		fn getY = null;//fixme; //get last param
 		fn mul = Op.mul.f;
 		fn add = Op.add.f;
 		fn sqrt = Op.sqrt.f;
@@ -76,6 +90,8 @@ public class TestBasics{
 				)
 			)
 		);
+		*/
+		fn hypot = null; //fixme
 		assertTrue(f(hypot,3,4).d()==5);
 		assertTrue(f(hypot,8,15).d()==17);
 	}
@@ -84,7 +100,7 @@ public class TestBasics{
 	which means curry 1, since that includes the func itself in the curry list
 	so can recurse.
 	*/
-	public void testRecurFibonacci(){
+	public static void testRecurFibonacci(){
 		//fn recur = Op.recur.f;
 		
 		//TODO baseCase 0 returns 0, and baseCase 1 returns 1.
@@ -104,7 +120,8 @@ public class TestBasics{
 	<br><br>
 	Changed the design so theres no fn:recur and instead curry ops
 	*/
-	public void testRecurOfCurry2(){
+	public static void testRecurOfCurry2(){
+		/*
 		//fn recur = Op.recur.f;
 		fn k = Op.k.f;
 		fn add = Op.add.f;
@@ -119,11 +136,12 @@ public class TestBasics{
 		//Will call F(getCurrySelf (k restOfListA) (k restOfListB))
 		//TODO ,restOfListA syntax, means (k restOfListA), like ;abc means "abc".
 		fn sumOfSquaresIn2LinkedLists = TODO;
-		/*TODO this must simultaneously handle how currying affects the param of func
-		and how recur affects the func. Are they compatible? I havent defined
-		what param currying generates yet (2019-10-15) in this fork of occamsfuncer,
-		and I'm using this testRecurOfCurry2 to help me figure out how to design it.
+		//TODO this must simultaneously handle how currying affects the param of func
+		//and how recur affects the func. Are they compatible? I havent defined
+		//what param currying generates yet (2019-10-15) in this fork of occamsfuncer,
+		//and I'm using this testRecurOfCurry2 to help me figure out how to design it.
 		*/
+		fn sumOfSquaresIn2LinkedLists = null; //fixme
 		assertTrue(sumOfSquaresIn2LinkedLists.f(l(3,5,4)).f(l(2,10,8)).d()==3*2+5*10+4*8);
 		assertTrue(sumOfSquaresIn2LinkedLists.f(l(13,5,4)).f(l(2,110,8)).d()==13*2+5*110+4*8);
 	}
@@ -156,8 +174,8 @@ public class TestBasics{
 	}
 	
 	public static void main(String[] args){
-		TestBasics t = new TestBasics();
-		t.testSkk();
+		//TestBasics t = new TestBasics();
+		testSkk();
 		System.err.println("first test passed. system is booted.");
 		testCurry2Hypot();
 		testRecurFibonacci();

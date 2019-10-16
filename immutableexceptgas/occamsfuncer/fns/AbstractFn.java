@@ -2,6 +2,7 @@
 package immutableexceptgas.occamsfuncer.fns;
 import java.io.OutputStream;
 import immutableexceptgas.occamsfuncer.*;
+import immutableexceptgas.occamsfuncer.util.Compare;
 
 public abstract class AbstractFn<T> implements fn<T>{
 	
@@ -23,6 +24,10 @@ public abstract class AbstractFn<T> implements fn<T>{
 	
 	public fn idWeakref(){
 		throw new Error("TODO return an object thats same as id()'s type:content bytes but the type is h: and is a weakref to the same type:content except type is H:. H: is followed by ipfs/multihash hash which is normally 34 bytes so total 36 bytes.");
+	}
+	
+	public final boolean equals(Object o){
+		return this==o || ((o instanceof fn) && compareTo((fn)o)==0);
 	}
 
 }

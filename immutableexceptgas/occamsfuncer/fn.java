@@ -4,6 +4,8 @@ import static immutableexceptgas.occamsfuncer.util.ImportStatic.*;
 import java.io.ByteArrayOutputStream;
 import java.io.OutputStream;
 
+import immutableexceptgas.occamsfuncer.util.Compare;
+
 /** the core object type.
 <br><br>
 This is a p2p gaming-low-lag system
@@ -44,8 +46,12 @@ Every object is halted. There are no objects representing a live function call,
 but calls within a call can themselves be halted before the outer call is halted,
 and thats represented as <func,param> or <func,param,return>
 or <timeAve,timeStdDev,nonce,func,param,return> etc.
+<br><br>
+As Comparable, its by fn.id() and does not reorder things other than fn
+(TODO or should it sort all fn after those?),
+specificly Compare.compare(fn.id().rawGet(),fn.id().rawGet()).
 */
-public interface fn<T>{
+public interface fn<T> extends Comparable{
 	
 	/** example: H:34bytesofMultihashAkaIpfsName.
 	Anything thats at most this many bytes is its own id.
@@ -64,6 +70,10 @@ public interface fn<T>{
 		return f(wr(param));
 	}
 	
+	/** true if rawGet does not start with "`:" (Call),
+	but TODO find a more efficient way to check for that,
+	maybe a func to get the nth byte of rawGet without the whole thing.
+	*/
 	public boolean isLeaf();
 	
 	/** x.L().f(x.R()).equals(x), for all fn x.
@@ -113,8 +123,22 @@ public interface fn<T>{
 	*/
 	public fn idWeakref();
 	
-	/** curries remaining before eval */
+	/** TODO Curries remaining before second eval. At 1 less curry than this,
+	if there are any constraints (such as in Op.mapPair or Op.F),
+	those constraints are checked and Gas.infLoop() if they fail,
+	which is similar to https://en.wikipedia.org/wiki/Typed_lambda_calculus
+	<br><br>
+	This guarantees, for example, that any MapPair's size will always be the
+	sum of its 2 child sizes and keys sorted by id, if the MapPair has
+	cur()-1	params, and at cur() params it returns value at that (last param) key.
+	Without evaling at those 2 steps (at cur and cur-1),
+	MapPair would need a separate mapGet func and could not take another
+	param to get the value of that key.
+	*/
 	public byte cur();
+	
+	//TODO where do the constraintChecker (at cur-1) and normalEval (at cur) go?
+	//Should Op take 2 javaLambda params?
 	
 	/** Returns true if id()'s type is h (weakref) or H (strongref),
 	else that type is ?: (local id, not to cross untrusted borders).
@@ -141,6 +165,11 @@ public interface fn<T>{
 	/** whatever I wrap, get that, such as float[][][] or Double or int[][]. */
 	public T v();
 	
+	/** If true, then id()==Cache.dedup(this). */
+	public default boolean fitsInId(){
+		return rawLen() <= maxIdSize;
+	}
+	
 	/** length in bytes of type:content.
 	For bigger bytestrings, can put them in a treemap or avltreelist
 	which will themselves be type:content nodes.
@@ -159,6 +188,12 @@ public interface fn<T>{
 		};
 		rawGet(b);
 		return b.toByteArray();
+	}
+	
+	public default int compareTo(Object o){
+		if(!(o instanceof fn)) return 0;
+		//base case: id()==Cache.dedup(this) for small leafs (at most size fn.maxIdSize)
+		return Compare.compare(id().rawGet(), ((fn)o).id().rawGet());
 	}
 	
 	//TODO avlTreeList funcs

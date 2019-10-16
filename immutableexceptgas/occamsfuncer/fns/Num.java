@@ -46,7 +46,7 @@ public class Num implements fn{
 	}
 
 	public fn id(){
-		throw new RuntimeException("TODO");
+		return this; //TODO optimize, since Num is its own id, will need to cache rawGet() byte[]
 	}
 
 	public int idSize(){
@@ -85,6 +85,19 @@ public class Num implements fn{
 	
 	public boolean isLeaf(){
 		return true;
+	}
+	
+	/** copied from AbstractFn cuz Num doesnt extend that cuz Num is always
+	its own id cuz fn.fitsInId().
+	*/
+	public final boolean equals(Object o){
+		return this==o || ((o instanceof fn) && compareTo((fn)o)==0);
+	}
+
+	@Override
+	public int compareTo(Object o) {
+		// TODO Auto-generated method stub
+		return 0;
 	}
 
 }

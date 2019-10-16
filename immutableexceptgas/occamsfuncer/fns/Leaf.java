@@ -73,7 +73,7 @@ public class Leaf<T> extends AbstractFn<T>{
 					String s = Text.bytesToString(cacheBytes); //FIXME might not be valid UTF8
 					int i = s.indexOf(':');
 					if(i != -1) s = s.substring(i+1);
-					cacheOp = Op.valueOf(s);
+					cacheOp = Enum.valueOf(Op.class, s);
 				}catch(Throwable t){
 					//TODO optimize. this could probably be done much faster than catch.
 					//not UTF8 (bytesToString) so is not an op name, or not one of the op names
@@ -99,7 +99,8 @@ public class Leaf<T> extends AbstractFn<T>{
 	}
 
 	public fn id(){
-		throw new Error("TODO");
+		return this; //FIXME only if this Leaf is already Cache.dedup.
+		//throw new Error("TODO");
 	}
 
 	public boolean isMerkle(){

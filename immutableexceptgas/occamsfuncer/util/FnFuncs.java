@@ -54,5 +54,9 @@ public class FnFuncs{
 	public static fn mapMaxKey(fn map){
 		return isMapPair(map) ? mapPairMaxKey(map) : mapSingleKey(map);
 	}
+	
+	public static fn mapPairGet(fn mapPair, fn key){
+		throw new Error("TODO");
+	}
 
 }

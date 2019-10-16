@@ -3,10 +3,31 @@ package immutableexceptgas.occamsfuncer;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.TreeMap;
 
+import immutableexceptgas.occamsfuncer.fns.Leaf;
 import immutableexceptgas.occamsfuncer.util.CallAsKey;
+import immutableexceptgas.occamsfuncer.util.Compare;
 
-/** renaming this from CacheFuncParamReturn to Cache cuz also merging Dedup into it.
+/** Dedup of single funcs and <func,param> key in <func,param,return>,
+use a partial dedup. It would be perfect dedup without id() if it
+compared every leaf by content, but it doesnt.
+Leafs where fn.rawLen()<=fn.maxIdSize are deduped by content,
+but bigger leafs are compared by ==.
+This propagates upward to wherever such leafs are reachable through L and R.
+Its enough to avoid exponential number of calls in forests of s and k,
+for example, even if they can reach large leafs.
+For perfect dedup, use id().
+An example of a large Leaf is a large float array used with OpenCL,
+which the id() is usually not computed for since its lazyEval
+and its often just a step toward a result to return that you would id()
+and share across the Internet.
+<br><br>
+<br><br>
+<br><br>
+OLD, TODO rewrite...
+<br><br>
+renaming this from CacheFuncParamReturn to Cache cuz also merging Dedup into it.
 <br><br>
 TODO
 Datastruct will be something like set of CallAsKey
@@ -29,15 +50,40 @@ OpenclUtil and ForestOp classes in the other fork of occamsfuncer
 public final class Cache{
 	private Cache(){}
 	
-	private static final Map<CallAsKey,fn> cache = new HashMap();
+	/** Perfect dedup except leafs bigger than fn.maxIdSize are deduped by ==
+	so anything which can reach them through L and R may also be
+	imperfect dedup by id().
+	edup by identityHashCode and == */
+	private static final Map<CallAsKey,fn> funcParamReturn = new HashMap();
+	
+	/** Each leaf that fits in id (fn.rawLen() at most fn.maxIdSize bytes)
+	is deduped here by content. Leafs bigger than that are by ==.
+	Of course id() is perfect dedup, meaning there should never be even 1
+	hash collision across the whole internet.
+	<br><br>
+	FIXME? should this map contain all leafs or just smallLeafs?
+	<br><br>
+	TODO optimize smallLeafs:
+	map with hashCode equals andOr comparator by rawGet.
+	I dont need TreeMap, even though that would work,
+	cuz I dont need to sort them, just to int .hashcode and .equals,
+	but just to get things working fast,
+	I will use TreeMap. Later this should be done by something
+	like HashMap modified to compute a salted int hash
+	(such as (a^w)*(b^x)-(c^y)*(d^z) for some 4 ints computed about it
+	and 4 static final ints w x y z randomized at start of each JVM run)
+	and to compare by content where hits the same bucket. 
+	*/
+	private static final Map<fn,fn> smallLeafs = new TreeMap(); //fn implements Comparable by id()
+		
 	
 	/** null if not putFuncParamReturn yet */
 	public static fn getRetOfFuncParamElseNull(fn func, fn param){
-		return cache.get(new CallAsKey(func,param));
+		return funcParamReturn.get(new CallAsKey(func,param));
 	}
 	
 	public static void putFuncParamReturn(fn func, fn param, fn ret){
-		cache.put(new CallAsKey(func,param), ret);
+		funcParamReturn.put(new CallAsKey(func,param), ret);
 	}
 	
 	public static void putLeaf(fn leaf){
@@ -45,7 +91,16 @@ public final class Cache{
 	}
 	
 	public static fn dedupLeaf(fn leaf){
-		throw new Error("TODO separate map for leafs up to max id size");
+		if(leaf.fitsInId()){
+			fn x = smallLeafs.get(leaf);
+			if(x == null){
+				x = leaf;
+				smallLeafs.put(x, x);
+			}
+			return x;
+		}else{
+			return leaf; //compare big leafs by ==
+		}
 	}
 	
 	/** If is a leaf thats supposed to be deduped (TODO is that just
@@ -93,10 +148,14 @@ public final class Cache{
 		//but would slow down cache lookups cuz would have to get from 2 maps.
 		//For now I just want the system to work and will optimize later.
 		
-		Iterator<Map.Entry<CallAsKey,fn>> iter = cache.entrySet().iterator();
+		Iterator<Map.Entry<CallAsKey,fn>> iter = funcParamReturn.entrySet().iterator();
 		while(iter.hasNext()){
 			if(!iter.next().getKey().retIsThisPair) iter.remove();
 		}
+		//FIXME what to do about smallLeafs?
+		//Probably should leave them (or at least whichever are still reachable)
+		//since this is partial clear and should not clear anything that could
+		//still be called in cache funcs. (FIXME is that circular logic?)
 	}
 	
 	public void clear(){
